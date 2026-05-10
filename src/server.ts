@@ -1,6 +1,7 @@
 import app from './app.js';
 import { env } from './config/index.js';
 import { logger } from './utils/index.js';
+import { startDiscordBot, stopDiscordBot } from './services/index.js';
 
 const server = app.listen(env.PORT, () => {
   console.log(`\n========================================`);
@@ -9,15 +10,16 @@ const server = app.listen(env.PORT, () => {
   console.log(`========================================\n`);
 });
 
-// Graceful shutdown
+startDiscordBot();
+
 const shutdown = (signal: string) => {
   logger.info(`${signal} received, shutting down gracefully`);
+  stopDiscordBot();
   server.close(() => {
     logger.info('Server closed');
     process.exit(0);
   });
 
-  // Force shutdown after 10 seconds
   setTimeout(() => {
     logger.error('Forced shutdown after timeout');
     process.exit(1);

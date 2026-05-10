@@ -1,8 +1,6 @@
 export interface VoiceCallOptions {
   to: string;
   message: string;
-  voice?: string;
-  language?: string;
 }
 
 export interface CallResult {

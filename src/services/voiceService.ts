@@ -8,26 +8,35 @@ const { VoiceResponse } = twilio.twiml;
 
 const E164_REGEX = /^\+[1-9]\d{1,14}$/;
 
+const TWILIO_ERROR_MESSAGES: Record<number, string> = {
+  21211: 'Invalid phone number',
+  21214: 'Phone number not verified (trial account limitation)',
+  21608: 'Unverified caller ID',
+};
+
 export function validatePhoneNumber(phone: string): boolean {
   return E164_REGEX.test(phone);
 }
 
-export function generateTwiML(message: string, voice = 'Polly.Amy', language = 'en-US'): string {
+export function generateTwiML(message: string): string {
   const response = new VoiceResponse();
-  response.say({ voice, language }, message);
+  response.say(message);
   return response.toString();
 }
 
 export async function makeCall(options: VoiceCallOptions): Promise<CallResult> {
-  const { to, message, voice = 'Polly.Amy', language = 'en-US' } = options;
+  const { to, message } = options;
 
   if (!validatePhoneNumber(to)) {
-    return { success: false, error: 'Invalid phone number format. Use E.164 format (+1234567890)' };
+    return {
+      success: false,
+      error: 'Invalid phone number format. Use E.164 format (+1234567890)'
+    };
   }
 
-  const twimlContent = generateTwiML(message, voice, language);
+  const twimlContent = generateTwiML(message);
 
-  logger.info({ to, voice, language }, 'Initiating voice call');
+  logger.info({ to }, 'Initiating voice call');
 
   try {
     const call = await twilioClient.calls.create({
@@ -44,20 +53,13 @@ export async function makeCall(options: VoiceCallOptions): Promise<CallResult> {
 
     logger.error({ error: twilioError, to }, 'Failed to initiate call');
 
-    // Handle common Twilio error codes
-    if (twilioError.code === 21211) {
-      return { success: false, error: 'Invalid phone number', errorCode: 21211 };
-    }
-    if (twilioError.code === 21214) {
-      return { success: false, error: 'Phone number not verified (trial account limitation)', errorCode: 21214 };
-    }
-    if (twilioError.code === 21608) {
-      return { success: false, error: 'Unverified caller ID', errorCode: 21608 };
-    }
+    const errorMessage = twilioError.code
+      ? TWILIO_ERROR_MESSAGES[twilioError.code]
+      : undefined;
 
     return {
       success: false,
-      error: twilioError.message || 'Failed to initiate call',
+      error: errorMessage || twilioError.message || 'Failed to initiate call',
       errorCode: twilioError.code,
     };
   }

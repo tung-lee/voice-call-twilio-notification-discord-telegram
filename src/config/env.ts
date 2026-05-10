@@ -7,10 +7,13 @@ const envSchema = z.object({
   PORT: z.string().default('3000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
-  API_KEY: z.string().min(1, 'API_KEY is required'),
   TWILIO_ACCOUNT_SID: z.string().min(1, 'TWILIO_ACCOUNT_SID is required'),
   TWILIO_AUTH_TOKEN: z.string().min(1, 'TWILIO_AUTH_TOKEN is required'),
   TWILIO_PHONE_NUMBER: z.string().regex(/^\+[1-9]\d{1,14}$/, 'Invalid E.164 phone number'),
+  CALL_TO_NUMBER: z.string().regex(/^\+[1-9]\d{1,14}$/, 'Invalid E.164 phone number'),
+  DISCORD_BOT_TOKEN: z.string().min(1, 'DISCORD_BOT_TOKEN is required'),
+  DISCORD_COOLDOWN_MS: z.coerce.number().default(300000),
+  DISCORD_CHANNEL_ID: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
