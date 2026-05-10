@@ -14,6 +14,11 @@ const envSchema = z.object({
   DISCORD_BOT_TOKEN: z.string().min(1, 'DISCORD_BOT_TOKEN is required'),
   DISCORD_COOLDOWN_MS: z.coerce.number().default(300000),
   DISCORD_CHANNEL_ID: z.string().optional(),
+  TELEGRAM_API_ID: z.coerce.number().optional(),
+  TELEGRAM_API_HASH: z.string().optional(),
+  TELEGRAM_SESSION: z.string().optional(),
+  TELEGRAM_CHANNEL_ID: z.string().optional(),
+  TELEGRAM_COOLDOWN_MS: z.coerce.number().default(300000),
 });
 
 const parsed = envSchema.safeParse(process.env);

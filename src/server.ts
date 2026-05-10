@@ -1,7 +1,7 @@
 import app from './app.js';
 import { env } from './config/index.js';
 import { logger } from './utils/index.js';
-import { startDiscordBot, stopDiscordBot } from './services/index.js';
+import { startDiscordBot, stopDiscordBot, startTelegramTracker, stopTelegramTracker } from './services/index.js';
 
 const server = app.listen(env.PORT, () => {
   console.log(`\n========================================`);
@@ -11,10 +11,12 @@ const server = app.listen(env.PORT, () => {
 });
 
 startDiscordBot();
+startTelegramTracker().catch((err) => logger.error({ err }, 'Telegram tracker failed to start'));
 
-const shutdown = (signal: string) => {
+const shutdown = async (signal: string) => {
   logger.info(`${signal} received, shutting down gracefully`);
   stopDiscordBot();
+  await stopTelegramTracker();
   server.close(() => {
     logger.info('Server closed');
     process.exit(0);
