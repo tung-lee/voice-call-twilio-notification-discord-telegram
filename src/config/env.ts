@@ -19,6 +19,11 @@ const envSchema = z.object({
   TELEGRAM_SESSION: z.string().optional(),
   TELEGRAM_CHANNEL_ID: z.string().optional(),
   TELEGRAM_COOLDOWN_MS: z.coerce.number().default(300000),
+  CALL_PROVIDER: z.enum(['twilio', 'telnyx']).default('twilio'),
+  TELNYX_API_KEY: z.string().optional(),
+  TELNYX_CONNECTION_ID: z.string().optional(),
+  TELNYX_PHONE_NUMBER: z.string().optional(),
+  TELNYX_WEBHOOK_URL: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
