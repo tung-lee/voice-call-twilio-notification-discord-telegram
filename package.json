@@ -1,7 +1,7 @@
 {
-  "name": "voice-call-twilio-notification",
+  "name": "alpha-signal-reminder",
   "version": "1.0.0",
-  "description": "Discord bot + Twilio voice call notification server",
+  "description": "Monitors Discord/Telegram for token signals and rings your phone via SIP",
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
@@ -12,7 +12,7 @@
     "pm2:start": "npm run build && pm2 start ecosystem.config.cjs",
     "pm2:stop": "pm2 stop ecosystem.config.cjs",
     "pm2:restart": "npm run build && pm2 restart ecosystem.config.cjs",
-    "pm2:logs": "pm2 logs voice-call-twilio-notification",
+    "pm2:logs": "pm2 logs alpha-signal-reminder",
     "pm2:delete": "pm2 delete ecosystem.config.cjs",
     "telegram:auth": "tsx src/scripts/telegram-auth.ts"
   },
@@ -31,8 +31,8 @@
     "input": "^1.0.1",
     "pino": "^9.4.0",
     "pino-http": "^10.3.0",
+    "sip": "^0.0.6",
     "telegram": "^2.26.22",
-    "telnyx": "^6.58.0",
     "twilio": "^5.3.0",
     "zod": "^3.23.8"
   },

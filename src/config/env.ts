@@ -19,11 +19,12 @@ const envSchema = z.object({
   TELEGRAM_SESSION: z.string().optional(),
   TELEGRAM_CHANNEL_ID: z.string().optional(),
   TELEGRAM_COOLDOWN_MS: z.coerce.number().default(300000),
-  CALL_PROVIDER: z.enum(['twilio', 'telnyx']).default('twilio'),
-  TELNYX_API_KEY: z.string().optional(),
-  TELNYX_CONNECTION_ID: z.string().optional(),
-  TELNYX_PHONE_NUMBER: z.string().optional(),
-  TELNYX_WEBHOOK_URL: z.string().optional(),
+  CALL_PROVIDER: z.enum(['twilio', 'sip']).default('sip'),
+  SIP_BOT_USER: z.string().default('alertbot'),
+  SIP_BOT_DOMAIN: z.string().default('iptel.org'),
+  SIP_TARGET_USER: z.string().default('ericle'),
+  SIP_TARGET_DOMAIN: z.string().default('sip.linphone.org'),
+  SIP_RING_DURATION_MS: z.coerce.number().default(30000),
 });
 
 const parsed = envSchema.safeParse(process.env);

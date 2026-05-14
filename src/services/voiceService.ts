@@ -1,6 +1,6 @@
 import twilio from 'twilio';
 import { twilioClient } from './twilioClient.js';
-import { telnyxClient } from './telnyxClient.js';
+import { ringViaSip } from './sipCallService.js';
 import { env } from '../config/index.js';
 import { logger } from '../utils/index.js';
 import type { VoiceCallOptions, CallResult } from '../types/index.js';
@@ -56,41 +56,18 @@ async function makeCallViaTwilio(options: VoiceCallOptions): Promise<CallResult>
   }
 }
 
-async function makeCallViaTelnyx(options: VoiceCallOptions): Promise<CallResult> {
-  const { to, message } = options;
 
-  if (!env.TELNYX_CONNECTION_ID || !env.TELNYX_PHONE_NUMBER || !env.TELNYX_WEBHOOK_URL) {
-    return {
-      success: false,
-      error: 'Telnyx not fully configured — set TELNYX_CONNECTION_ID, TELNYX_PHONE_NUMBER, TELNYX_WEBHOOK_URL',
-    };
-  }
-
-  // Pass message via query param so the TeXML webhook can read it
-  const webhookUrl = `${env.TELNYX_WEBHOOK_URL}/telnyx/answer?message=${encodeURIComponent(message)}`;
-
-  logger.info({ to, provider: 'telnyx' }, 'Initiating voice call');
-
-  try {
-    const response = await telnyxClient.calls.dial({
-      connection_id: env.TELNYX_CONNECTION_ID,
-      to,
-      from: env.TELNYX_PHONE_NUMBER,
-      webhook_url: webhookUrl,
-      webhook_url_method: 'POST',
-    });
-
-    const callSid = response.data?.call_control_id;
-    logger.info({ callSid, to }, 'Telnyx call initiated successfully');
-    return { success: true, callSid };
-  } catch (error) {
-    const err = error as { message?: string };
-    logger.error({ error: err, to }, 'Telnyx call failed');
-    return { success: false, error: err.message || 'Failed to initiate Telnyx call' };
-  }
+async function makeCallViaSip(): Promise<CallResult> {
+  logger.info({ provider: 'sip' }, 'Initiating SIP ring');
+  const result = await ringViaSip();
+  return result;
 }
 
 export async function makeCall(options: VoiceCallOptions): Promise<CallResult> {
+  if (env.CALL_PROVIDER === 'sip') {
+    return makeCallViaSip();
+  }
+
   if (!validatePhoneNumber(options.to)) {
     return {
       success: false,
@@ -98,7 +75,5 @@ export async function makeCall(options: VoiceCallOptions): Promise<CallResult> {
     };
   }
 
-  return env.CALL_PROVIDER === 'telnyx'
-    ? makeCallViaTelnyx(options)
-    : makeCallViaTwilio(options);
+  return makeCallViaTwilio(options);
 }

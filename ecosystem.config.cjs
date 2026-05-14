@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'voice-call-twilio-notification',
+      name: 'alpha-signal-reminder',
       script: './dist/server.js',
       instances: 1,
       autorestart: true,
