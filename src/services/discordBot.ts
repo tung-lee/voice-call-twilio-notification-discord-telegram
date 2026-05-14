@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits } from 'discord.js';
 import { env } from '../config/index.js';
 import { logger } from '../utils/index.js';
 import { makeCall } from './voiceService.js';
+import { sendSipMessage } from './sipCallService.js';
 
 class CallCooldown {
   private lastCallTime = 0;
@@ -52,13 +53,14 @@ client.on('messageCreate', async (message) => {
     'Discord message — triggering call'
   );
 
-  const result = await makeCall({
-    to: env.CALL_TO_NUMBER,
-    message: 'You have a new message in Discord.',
-  });
+  const preview = message.content.slice(0, 200);
+  const [, callResult] = await Promise.all([
+    sendSipMessage(`[Discord] ${message.author.tag}: ${preview}`),
+    makeCall({ to: env.CALL_TO_NUMBER, message: 'You have a new message in Discord.' }),
+  ]);
 
-  if (!result.success) {
-    logger.error({ error: result.error }, 'Discord-triggered call failed');
+  if (!callResult.success) {
+    logger.error({ error: callResult.error }, 'Discord-triggered call failed');
   }
 });
 

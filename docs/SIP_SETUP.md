@@ -71,67 +71,7 @@ Your iPhone should ring within 3–5 seconds.
 
 ## Errors We Hit and How We Fixed Them
 
-### Error 1: `require is not defined in ES module scope`
-
-**When:** Importing the `sip` npm package (CommonJS) in a TypeScript ESM project.
-
-**Error:**
-```
-ReferenceError: require is not defined in ES module scope
-```
-
-**Cause:** The project uses `"type": "module"` in `package.json`, so `require()` doesn't exist.
-
-**Fix:** Use `createRequire` from Node's built-in `module` package:
-
-```typescript
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const sip = require('sip');
-const digest = require('sip/digest');
-```
-
----
-
-### Error 2: Password containing `#` silently stripped by dotenv
-
-**When:** Setting a SIP password with a `#` character in `.env`.
-
-**Error:** No explicit error — the password was just wrong, causing auth failures.
-
-**Cause:** dotenv treats `#` as the start of an inline comment:
-```env
-SIP_BOT_PASSWORD=#Bv.vZK9q3SJWtg   # dotenv reads this as empty!
-```
-
-**Fix:** Wrap passwords containing special characters in double quotes:
-```env
-SIP_BOT_PASSWORD="#Bv.vZK9q3SJWtg"
-```
-
----
-
-### Error 3: `EADDRINUSE: address already in use :::3000`
-
-**When:** Restarting the server during development.
-
-**Error:**
-```
-Error: listen EADDRINUSE: address already in use :::3000
-```
-
-**Cause:** Previous server process still running.
-
-**Fix:**
-```bash
-lsof -ti:3000 | xargs kill -9
-```
-
-Or use PM2 which handles restarts cleanly: `npm run pm2:restart`
-
----
-
-### Error 4: `sip.linphone.org` returns `403 Forbidden` on REGISTER
+### 1. `sip.linphone.org` returns `403 Forbidden` on REGISTER
 
 **When:** Trying to register the bot directly at `sip.linphone.org`.
 
@@ -142,11 +82,11 @@ REGISTER failed: 403
 
 **Cause:** `sip.linphone.org` (Flexisip server) intentionally blocks third-party SIP client registrations. It only allows registrations from the official Linphone SDK. Spoofing the `User-Agent` header (`LinphoneApp/6.0.0`) did not help — the server detects it at a protocol level.
 
-**Fix:** Don't register at `sip.linphone.org`. Instead, use SIP federation — see Error 7.
+**Fix:** Don't register at `sip.linphone.org`. Instead, use SIP federation — see section 4.
 
 ---
 
-### Error 5: `sip2sip.info` TCP port 5060 `ECONNREFUSED`
+### 2. `sip2sip.info` TCP port 5060 `ECONNREFUSED`
 
 **When:** Trying to REGISTER the bot at `sip2sip.info` using TCP transport.
 
@@ -159,11 +99,11 @@ REGISTER failed: 503
 
 **Cause:** `sip2sip.info` blocks TCP port 5060 from Vietnamese IP addresses (geo-blocking). Both resolved IPs refused the connection.
 
-**Fix:** Tried UDP (see Error 6). Ultimately abandoned `sip2sip.info` entirely.
+**Fix:** Tried UDP (see section 3). Ultimately abandoned `sip2sip.info` entirely.
 
 ---
 
-### Error 6: `sip2sip.info` UDP REGISTER times out with `408`
+### 3. `sip2sip.info` UDP REGISTER times out with `408`
 
 **When:** Switching to UDP transport for `sip2sip.info`.
 
@@ -196,7 +136,7 @@ Even with the correct local IP in the Via header, `sip2sip.info` never responded
 
 ---
 
-### Error 7: Direct INVITE to `sip.linphone.org` returns `403` when `From` domain is also `sip.linphone.org`
+### 4. Direct INVITE to `sip.linphone.org` returns `403` when `From` domain is also `sip.linphone.org`
 
 **When:** Sending INVITE directly to `ericle@sip.linphone.org` with `From: sip:ericbot@sip.linphone.org`.
 

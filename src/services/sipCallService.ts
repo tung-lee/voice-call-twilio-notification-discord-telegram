@@ -12,6 +12,11 @@ export interface SipRingResult {
   error?: string;
 }
 
+export interface SipMessageResult {
+  success: boolean;
+  error?: string;
+}
+
 function getLocalIp(): string {
   const nets = os.networkInterfaces();
   for (const ifaces of Object.values(nets)) {
@@ -39,59 +44,115 @@ function makeSdp(ip: string): string {
   );
 }
 
+// Persistent stack — started once, shared by MESSAGE and INVITE
+let stackStarted = false;
+let localIp = '127.0.0.1';
+let stackPort = 5060;
+let activeCallFinish: ((success: boolean, error?: string) => void) | null = null;
 let sipActive = false;
+
+function ensureStack() {
+  if (stackStarted) return;
+  localIp = getLocalIp();
+  stackPort = 5060 + Math.floor(Math.random() * 4000);
+
+  sip.start({
+    port: stackPort,
+    address: localIp,
+    hostname: localIp,
+  }, (req: Record<string, unknown>) => {
+    if (req.method === 'BYE') {
+      sip.send(sip.makeResponse(req, 200, 'OK'));
+      if (activeCallFinish) {
+        activeCallFinish(true);
+        activeCallFinish = null;
+      }
+    } else {
+      sip.send(sip.makeResponse(req, 200, 'OK'));
+    }
+  });
+
+  stackStarted = true;
+}
+
+export async function sendSipMessage(text: string): Promise<SipMessageResult> {
+  ensureStack();
+
+  const botUser = env.SIP_BOT_USER!;
+  const botDomain = env.SIP_BOT_DOMAIN!;
+  const targetUser = env.SIP_TARGET_USER!;
+  const targetDomain = env.SIP_TARGET_DOMAIN!;
+  const targetUri = `sip:${targetUser}@${targetDomain}`;
+  const fromUri = `sip:${botUser}@${botDomain}`;
+
+  const rq = {
+    method: 'MESSAGE',
+    uri: targetUri,
+    headers: {
+      to: { uri: targetUri },
+      from: { uri: fromUri, params: { tag: crypto.randomBytes(4).toString('hex') } },
+      'call-id': `${crypto.randomUUID()}@${localIp}`,
+      cseq: { method: 'MESSAGE', seq: 1 },
+      'max-forwards': 70,
+      'content-type': 'text/plain;charset=UTF-8',
+      'content-length': Buffer.byteLength(text),
+    },
+    content: text,
+  };
+
+  logger.info({ target: targetUri }, 'SIP message sending');
+
+  return new Promise((resolve) => {
+    sip.send(rq, (rs: Record<string, unknown>) => {
+      const status = rs.status as number;
+      if (status < 200) return;
+      if (status >= 200 && status < 300) {
+        resolve({ success: true });
+      } else {
+        logger.warn({ status, reason: rs.reason }, 'SIP message delivery uncertain');
+        resolve({ success: false, error: `SIP ${status}: ${rs.reason}` });
+      }
+    });
+  });
+}
 
 export async function ringViaSip(): Promise<SipRingResult> {
   if (sipActive) {
     return { success: false, error: 'SIP call already in progress' };
   }
 
+  ensureStack();
+  sipActive = true;
+
+  const botUser = env.SIP_BOT_USER!;
+  const botDomain = env.SIP_BOT_DOMAIN!;
+  const targetUser = env.SIP_TARGET_USER!;
+  const targetDomain = env.SIP_TARGET_DOMAIN!;
+  const ringDuration = env.SIP_RING_DURATION_MS;
+
+  const targetUri = `sip:${targetUser}@${targetDomain}`;
+  const fromUri = `sip:${botUser}@${botDomain}`;
+  const callId = `${crypto.randomUUID()}@${localIp}`;
+  const fromTag = crypto.randomBytes(4).toString('hex');
+
+  let cseq = 1;
+  let done = false;
+  let callAnswered = false;
+  let ringTimer: NodeJS.Timeout | undefined;
+  let toHeader: unknown = null;
+  let fromHeader: unknown = null;
+
   return new Promise((resolve) => {
-    sipActive = true;
-
-    const localIp = getLocalIp();
-    const botUser = env.SIP_BOT_USER!;
-    const botDomain = env.SIP_BOT_DOMAIN!;
-    const targetUser = env.SIP_TARGET_USER!;
-    const targetDomain = env.SIP_TARGET_DOMAIN!;
-    const ringDuration = env.SIP_RING_DURATION_MS;
-
-    const targetUri = `sip:${targetUser}@${targetDomain}`;
-    const fromUri = `sip:${botUser}@${botDomain}`;
-    const callId = `${crypto.randomUUID()}@${localIp}`;
-    const fromTag = crypto.randomBytes(4).toString('hex');
-    const port = 5060 + Math.floor(Math.random() * 4000);
-
-    let cseq = 1;
-    let done = false;
-    let callAnswered = false;
-    let ringTimer: NodeJS.Timeout | undefined;
-    let toHeader: unknown = null;
-    let fromHeader: unknown = null;
-
     const finish = (success: boolean, error?: string) => {
       if (done) return;
       done = true;
       clearTimeout(ringTimer);
-      setTimeout(() => {
-        try { sip.stop(); } catch { /* ignore */ }
-        sipActive = false;
-      }, 300);
+      activeCallFinish = null;
+      sipActive = false;
       resolve({ success, error });
     };
 
-    sip.start({
-      port,
-      address: localIp,
-      hostname: localIp,
-    }, (req: Record<string, unknown>) => {
-      if (req.method === 'BYE') {
-        sip.send(sip.makeResponse(req, 200, 'OK'));
-        finish(true);
-      } else {
-        sip.send(sip.makeResponse(req, 200, 'OK'));
-      }
-    });
+    activeCallFinish = finish;
 
     const buildInvite = () => {
       const sdp = makeSdp(localIp);
@@ -115,44 +176,37 @@ export async function ringViaSip(): Promise<SipRingResult> {
     const sendCancel = (rq: Record<string, unknown>) => {
       const headers = rq.headers as Record<string, unknown>;
       const cseqObj = headers.cseq as { seq: number };
-      sip.send(
-        {
-          method: 'CANCEL',
-          uri: targetUri,
-          headers: {
-            to: headers.to,
-            from: headers.from,
-            'call-id': callId,
-            cseq: { method: 'CANCEL', seq: cseqObj.seq },
-            'max-forwards': 70,
-            'content-length': 0,
-          },
+      sip.send({
+        method: 'CANCEL',
+        uri: targetUri,
+        headers: {
+          to: headers.to,
+          from: headers.from,
+          'call-id': callId,
+          cseq: { method: 'CANCEL', seq: cseqObj.seq },
+          'max-forwards': 70,
+          'content-length': 0,
         },
-        () => finish(true),
-      );
+      }, () => finish(true));
     };
 
     const sendBye = () => {
-      sip.send(
-        {
-          method: 'BYE',
-          uri: targetUri,
-          headers: {
-            to: toHeader,
-            from: fromHeader,
-            'call-id': callId,
-            cseq: { method: 'BYE', seq: cseq++ },
-            'max-forwards': 70,
-            'content-length': 0,
-          },
+      sip.send({
+        method: 'BYE',
+        uri: targetUri,
+        headers: {
+          to: toHeader,
+          from: fromHeader,
+          'call-id': callId,
+          cseq: { method: 'BYE', seq: cseq++ },
+          'max-forwards': 70,
+          'content-length': 0,
         },
-        () => finish(true),
-      );
+      }, () => finish(true));
     };
 
     const handleResponse = (rq: Record<string, unknown>, rs: Record<string, unknown>) => {
       if (done) return;
-
       const status = rs.status as number;
       const rsHeaders = rs.headers as Record<string, unknown>;
       const rqHeaders = rq.headers as Record<string, unknown>;
@@ -188,7 +242,6 @@ export async function ringViaSip(): Promise<SipRingResult> {
       } else if (status === 487) {
         finish(true);
       } else if (status === 603) {
-        // Declined by user — still a success (alert was delivered)
         finish(true);
       } else if (status >= 400) {
         logger.error({ status, reason: rs.reason }, 'SIP call failed');
@@ -197,9 +250,7 @@ export async function ringViaSip(): Promise<SipRingResult> {
     };
 
     const rq = buildInvite();
-    logger.info({ target: targetUri, port }, 'SIP call initiated');
-    sip.send(rq, (rs: Record<string, unknown>) => {
-      handleResponse(rq, rs);
-    });
+    logger.info({ target: targetUri }, 'SIP call initiated');
+    sip.send(rq, (rs: Record<string, unknown>) => handleResponse(rq, rs));
   });
 }

@@ -5,6 +5,7 @@ import type { NewMessageEvent } from 'telegram/events/NewMessage.js';
 import { env } from '../config/index.js';
 import { logger } from '../utils/index.js';
 import { makeCall } from './voiceService.js';
+import { sendSipMessage } from './sipCallService.js';
 
 // EVM: 0x + 40 hex chars
 const EVM_REGEX = /\b0x[a-fA-F0-9]{40}\b/g;
@@ -57,13 +58,13 @@ async function handleMessage(event: NewMessageEvent): Promise<void> {
 
   cooldown.reset();
 
-  const result = await makeCall({
-    to: env.CALL_TO_NUMBER!,
-    message: 'New token address detected in your Telegram channel.',
-  });
+  const [, callResult] = await Promise.all([
+    sendSipMessage(`[Telegram] Token detected:\n${addresses.join('\n')}`),
+    makeCall({ to: env.CALL_TO_NUMBER!, message: 'New token address detected in your Telegram channel.' }),
+  ]);
 
-  if (!result.success) {
-    logger.error({ error: result.error }, 'Telegram-triggered call failed');
+  if (!callResult.success) {
+    logger.error({ error: callResult.error }, 'Telegram-triggered call failed');
   }
 }
 
