@@ -32,7 +32,7 @@ const client = new Client({
   ],
 });
 
-client.once('ready', () => {
+client.once('clientReady', () => {
   logger.info({ tag: client.user?.tag }, 'Discord bot connected');
 });
 

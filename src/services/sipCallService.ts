@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const sip = require('sip');
+const sip = require('@vexyl.ai/sip');
 
 export interface SipRingResult {
   success: boolean;

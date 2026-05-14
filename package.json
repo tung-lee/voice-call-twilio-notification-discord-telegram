@@ -25,13 +25,13 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@vexyl.ai/sip": "^1.0.3",
     "discord.js": "^14.26.4",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "input": "^1.0.1",
     "pino": "^9.4.0",
     "pino-http": "^10.3.0",
-    "sip": "^0.0.6",
     "telegram": "^2.26.22",
     "twilio": "^5.3.0",
     "zod": "^3.23.8"
